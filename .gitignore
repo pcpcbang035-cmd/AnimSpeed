@@ -1,0 +1,5 @@
+# build outputs
+build/
+*.deb
+*.zip
+.DS_Store
