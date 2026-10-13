@@ -19,6 +19,8 @@ STAGE="$OUT/stage"
 [ -d "$SDK" ] || { echo "找不到 SDK: $SDK"; exit 1; }
 [ -x "$LD_BIN" ] || { echo "找不到 ld64: $LD_BIN"; exit 1; }
 [ -f "$FAKESDK/usr/lib/libSystem.dylib" ] || { echo "找不到 stub sysroot: $FAKESDK"; exit 1; }
+[ -f "control" ] || { echo "找不到 control 文件"; exit 1; }
+command -v dpkg-deb >/dev/null || { echo "找不到 dpkg-deb，请安装 dpkg"; exit 1; }
 
 rm -rf "$OUT"
 mkdir -p "$OUT" "$STAGE"
@@ -68,7 +70,7 @@ mkdir -p "$STAGE/$DESTDIR"
 cp "$OUT/AnimSpeed.dylib" "$STAGE/$DESTDIR/"
 cp AnimSpeed.plist        "$STAGE/$DESTDIR/"
 mkdir -p "$STAGE/DEBIAN"
-sed "s/^Architecture:.*/Architecture: $ARCH_FIELD/" DEBIAN/control > "$STAGE/DEBIAN/control"
+sed "s/^Architecture:.*/Architecture: $ARCH_FIELD/" control > "$STAGE/DEBIAN/control"
 chmod 0755 "$STAGE/DEBIAN"
 chmod 0644 "$STAGE/DEBIAN/control"
 chmod 0755 "$STAGE/$DESTDIR/AnimSpeed.dylib"

@@ -38,6 +38,45 @@ Create `/var/mobile/Library/Preferences/com.ho.animspeed.plist`:
 
 `Speed` is the multiplier (default `80`). Respring after changing it.
 
+## Verifying installation
+
+After installing and respringing, check that the tweak actually loaded:
+
+```sh
+ls -l /var/mobile/AnimSpeed.loaded
+```
+
+If this file exists, AnimSpeed injected into SpringBoard successfully.
+If it is missing, the tweak is not running — see Troubleshooting below.
+
+To confirm the speedup is active, open/close an app or pull down
+Control Center: animations should be visibly faster than stock.
+
+## Troubleshooting
+
+**Marker file missing (`/var/mobile/AnimSpeed.loaded` does not exist)**
+
+The tweak never got injected. Common causes:
+
+- Wrong package flavor for your jailbreak: rootless jailbreaks
+  (Dopamine) need the `iphoneos-arm64` build; roothide-based jailbreaks
+  need the `iphoneos-arm64e` build. Installing the wrong one silently
+  does nothing.
+- Tweak injection itself is broken in your jailbreak environment.
+  This has been observed on some Relaxin (roothide) setups where
+  *no* SpringBoard tweak loads — not specific to AnimSpeed. If even
+  well-known tweaks have no effect, the problem is environmental.
+- Make sure you resprang after installing (not just respring via
+  Settings — use your jailbreak app's userspace reboot if unsure).
+
+**Animations feel unchanged**
+
+- Check the marker file first (above). No marker = not loaded.
+- Extremely high multipliers (200x+) can look identical to 80x on
+  some animations because iOS clamps very short durations.
+  If 80x feels the same as stock, the tweak is almost certainly
+  not loaded rather than "not fast enough".
+
 ## Building
 
 `build.sh` builds with upstream clang + cctools-port ld64 on Linux
