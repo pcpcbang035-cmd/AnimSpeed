@@ -3,6 +3,24 @@
 All notable changes to AnimSpeed are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [2.1] - 2026-10-16
+
+### Added
+- Diagnostic load marker: after init, the tweak writes
+  `/var/mobile/Library/Preferences/com.ho.animspeed.loaded` recording the
+  requested multiplier (`mult`), the coefficient written (`coef`), and
+  whether the drag-global write succeeded (`drag_write`: `ok` / `failed` /
+  `skipped`) — the anti-placebo device for on-device verification.
+  Disable with `DiagnosticMarker = false` in the prefs plist.
+- GitHub issue and pull-request templates (`.github/`)
+- README: "Testing status & known limitations" and "Contributing" sections
+
+### Fixed
+- The installation-verification step documented since v2.0.1 referenced a
+  marker file (`/var/mobile/AnimSpeed.loaded`) that the code never created;
+  the README now documents the marker the code actually writes, and the
+  troubleshooting section covers the new `drag_write=failed` case.
+
 ## [2.0.1] - 2026-10-13
 
 ### Added

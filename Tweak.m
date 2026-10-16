@@ -168,6 +168,43 @@ static bool animspeed_write_drag_coefficient(double v) {
 // Tweak entry point
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Diagnostic load marker — the anti-placebo device.
+// Don't trust feel; trust a file on disk. After a successful init, the tweak
+// writes a small marker recording what it did. On a device where injection
+// works, check it with Filza:
+//
+//   /var/mobile/Library/Preferences/com.ho.animspeed.loaded
+//
+// Marker contents:
+//   mult=80.000        requested speed multiplier
+//   coef=0.012500      coefficient actually written (1/mult)
+//   drag_write=ok      ok | failed | skipped (skipped = stock 1.0, untouched)
+//   <device timestamp>
+//
+// Toggle: set DiagnosticMarker = false in com.ho.animspeed.plist to disable.
+
+#define MARKER_PATH "/var/mobile/Library/Preferences/com.ho.animspeed.loaded"
+
+static bool AnimSpeedMarkerEnabled(NSDictionary *prefs) {
+    id flag = [prefs objectForKey:@"DiagnosticMarker"];
+    if (!flag) return true; // default: on
+    return [flag boolValue];
+}
+
+static void AnimSpeedWriteMarker(double mult, double coef, const char *result) {
+    @try {
+        NSDictionary *prefs = [NSDictionary dictionaryWithContentsOfFile:@PREFS_PATH];
+        if (!AnimSpeedMarkerEnabled(prefs)) return;
+        NSString *content = [NSString stringWithFormat:
+            @"mult=%.3f\ncoef=%.6f\ndrag_write=%s\n%@\n",
+            mult, coef, result, [[NSDate date] description]];
+        [content writeToFile:@MARKER_PATH atomically:YES
+                    encoding:NSUTF8StringEncoding error:NULL];
+    } @catch (...) {
+    }
+}
+
 static double AnimSpeedLoadMultiplier(void) {
     double mult = 80.0; // default: 80x
     @try {
@@ -187,9 +224,12 @@ __attribute__((constructor)) static void AnimSpeedInit(void) {
             if (coef < 0.0001) coef = 0.0001;
             // 1.0 is stock: never touch the global in that case, so we can't
             // clobber another tweak's override.
+            const char *dragResult = "skipped";
             if (fabs(coef - 1.0) > 1e-9) {
-                animspeed_write_drag_coefficient(coef);
+                dragResult = animspeed_write_drag_coefficient(coef) ? "ok" : "failed";
             }
+            // Diagnostic marker: prove on disk that the tweak actually ran.
+            AnimSpeedWriteMarker(mult, coef, dragResult);
         } @catch (...) {
         }
     }

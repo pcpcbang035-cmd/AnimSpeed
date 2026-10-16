@@ -38,23 +38,42 @@ Create `/var/mobile/Library/Preferences/com.ho.animspeed.plist`:
 
 `Speed` is the multiplier (default `80`). Respring after changing it.
 
+Set `DiagnosticMarker` to `false` to disable the diagnostic marker
+described below.
+
 ## Verifying installation
 
-After installing and respringing, check that the tweak actually loaded:
+After installing and respringing, check the diagnostic marker the tweak
+writes on load:
 
 ```sh
-ls -l /var/mobile/AnimSpeed.loaded
+cat /var/mobile/Library/Preferences/com.ho.animspeed.loaded
 ```
 
-If this file exists, AnimSpeed injected into SpringBoard successfully.
-If it is missing, the tweak is not running — see Troubleshooting below.
+Expected contents:
+
+```
+mult=80.000
+coef=0.012500
+drag_write=ok
+2026-10-16 11:20:00 +0000
+```
+
+- `mult` — the speed multiplier read from your prefs
+- `coef` — the coefficient actually written (`1/mult`)
+- `drag_write` — `ok` (write succeeded), `failed` (global not located),
+  or `skipped` (stock 1.0, intentionally untouched)
+
+If this file exists, AnimSpeed injected into SpringBoard and ran.
+If it is missing, the tweak never loaded — see Troubleshooting.
 
 To confirm the speedup is active, open/close an app or pull down
 Control Center: animations should be visibly faster than stock.
+Don't trust feel alone — trust the marker file.
 
 ## Troubleshooting
 
-**Marker file missing (`/var/mobile/AnimSpeed.loaded` does not exist)**
+**Marker file missing**
 
 The tweak never got injected. Common causes:
 
@@ -72,10 +91,30 @@ The tweak never got injected. Common causes:
 **Animations feel unchanged**
 
 - Check the marker file first (above). No marker = not loaded.
+- `drag_write=failed` means the coefficient global could not be located
+  on your iOS version — file an issue with your iOS version and device.
 - Extremely high multipliers (200x+) can look identical to 80x on
   some animations because iOS clamps very short durations.
   If 80x feels the same as stock, the tweak is almost certainly
   not loaded rather than "not fast enough".
+
+## Testing status & known limitations
+
+Honest state of the project:
+
+- **On-device verification of the speedup effect is still pending.**
+  The coefficient technique is ported from SBTweaker (MIT), whose
+  discovery code has shipped in production; the AnimSpeed packaging,
+  preference wiring, and default 80x multiplier are exercised through the
+  diagnostic marker path, not yet through a device report. Device reports
+  welcome — see "Contributing".
+- Requires a jailbreak with **working SpringBoard tweak injection**. If no
+  SpringBoard tweak loads on your setup (broken or archived loader), AnimSpeed
+  cannot work either — fix the loader first.
+- The iOS 18+ revision-gate path is handled by the discovery code but
+  untested on iOS 18/26 hardware.
+- Speeds above ~200x make most animations effectively instant; some system
+  UI may behave oddly — that's expected, not a bug.
 
 ## Building
 
@@ -98,6 +137,14 @@ newer iOS versions.
 
 A stock value (1.0) is never written, so enabling the tweak at 1x cannot
 clobber another tweak's override.
+
+## Contributing
+
+Device test reports are the most valuable contribution right now: install the
+`.deb`, set a Speed, respring, and tell us whether animations actually got
+faster (iOS version, device, jailbreak type — Dopamine rootless vs roothide,
+and which package flavor you installed; paste the marker file contents).
+Bug fixes, small features, and docs edits are welcome via pull request.
 
 ## Credits
 
