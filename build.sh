@@ -11,8 +11,18 @@ command -v clang >/dev/null || { echo "找不到 clang"; exit 1; }
 export LD_LIBRARY_PATH="$HOME/toolchains/lib:$HOME/toolchains/dispatch/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 
 SDK="${SDK:-$HOME/toolchains/sdks/iPhoneOS9.3.sdk}"
-LD_BIN="${LD_BIN:-/home/hatch/toolchains/cctools/bin/ld}"
 FAKESDK="${FAKESDK:-$HOME/toolchains/fakesdk}"
+
+# ld64 查找：优先 LD_BIN 环境变量，其次工具链目录，最后 PATH。
+# 绝不写死带用户名的绝对路径，否则换台机器就构建失败。
+LD_BIN="${LD_BIN:-}"
+if [ -z "$LD_BIN" ]; then
+    for _ld in "$HOME/toolchains/cctools/bin/ld" "$HOME/toolchains/bin/ld"; do
+        if [ -x "$_ld" ]; then LD_BIN="$_ld"; break; fi
+    done
+    [ -z "$LD_BIN" ] && LD_BIN="$(command -v ld 2>/dev/null || true)"
+fi
+unset _ld
 OUT="$PWD/build"
 STAGE="$OUT/stage"
 
@@ -77,10 +87,13 @@ chmod 0755 "$STAGE/$DESTDIR/AnimSpeed.dylib"
 chmod 0644 "$STAGE/$DESTDIR/AnimSpeed.plist"
 find "$STAGE/$(echo "$DESTDIR" | cut -d/ -f1)" -type d -exec chmod 0755 {} +
 
-# 文件名每次构建都唯一（用户要求：每次发的包换个新名字）
+# 文件名每次构建都唯一（用户要求：每次发的包换个新名字），
+# 并带上 control 里的版本号，方便区分不同版本
+VERSION="$(sed -n 's/^Version: *//p' control | head -1)"
+[ -n "$VERSION" ] || { echo "control 里找不到 Version 字段"; exit 1; }
 STAMP="$(date +%Y%m%d-%H%M%S)"
 RAND="$(head -c 3 /dev/urandom | od -An -tx1 | tr -d ' \n')"
-DEB="$OUT/AnimSpeed-v2-${TAG}-${STAMP}-${RAND}.deb"
+DEB="$OUT/AnimSpeed-v${VERSION}-${TAG}-${STAMP}-${RAND}.deb"
 dpkg-deb -Zgzip -b "$STAGE" "$DEB" >/dev/null
 echo "== 完成 =="
 ls -la "$DEB"

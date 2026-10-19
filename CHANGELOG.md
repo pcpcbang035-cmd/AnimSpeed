@@ -3,6 +3,17 @@
 All notable changes to AnimSpeed are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [2.2] - 2026-10-19
+
+### Fixed
+- `build.sh`: the `ld` linker lookup no longer hardcodes a
+  `/home/hatch/...` path — it probes `$LD_BIN` (env override),
+  `$HOME/toolchains/cctools/bin/ld`, `$HOME/toolchains/bin/ld`,
+  then `PATH`, so the script works on a contributor's machine too.
+- `build.sh`: the `.deb` filename now embeds the version from
+  `control` (e.g. `AnimSpeed-v2.2-rootless-...`) instead of a
+  hardcoded `v2`, so builds of different releases stay distinguishable.
+
 ## [2.1] - 2026-10-16
 
 ### Added
