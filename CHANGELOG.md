@@ -3,6 +3,26 @@
 All notable changes to AnimSpeed are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [2.3] - 2026-10-22
+
+### Added
+- Host-side unit tests for the disassembly scanner
+  (`tests/test_discovery.c`): synthetic ARM64 setter bodies for the
+  iOS 17 float/ungated and iOS 18+ double/gated patterns plus a
+  no-match negative case. Run with
+  `cc -std=c99 -Wall -Wno-unused-function -I. tests/test_discovery.c -o /tmp/test_discovery && /tmp/test_discovery`
+  — no device needed.
+
+### Changed
+- The drag-coefficient discovery core moved from `Tweak.m` into
+  `drag_discovery.h` as pure C (`animspeed_scan_drag`), so the
+  instruction-pattern matching is unit-testable on the host.
+  Runtime behavior is unchanged (verified by the new tests and a
+  full arm64e rebuild).
+- `build.sh` now runs the host unit tests fail-fast before
+  compiling; the build aborts if the scanner regresses
+  (`SKIP_TESTS=1` to opt out).
+
 ## [2.2] - 2026-10-19
 
 ### Fixed

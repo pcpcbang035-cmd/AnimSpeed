@@ -111,8 +111,9 @@ Honest state of the project:
 - Requires a jailbreak with **working SpringBoard tweak injection**. If no
   SpringBoard tweak loads on your setup (broken or archived loader), AnimSpeed
   cannot work either — fix the loader first.
-- The iOS 18+ revision-gate path is handled by the discovery code but
-  untested on iOS 18/26 hardware.
+- The iOS 18+ revision-gate path is handled by the discovery code and its
+  instruction-pattern matching is covered by the host unit tests
+  (`tests/test_discovery.c`), but it is still untested on iOS 18/26 hardware.
 - Speeds above ~200x make most animations effectively instant; some system
   UI may behave oddly — that's expected, not a bug.
 
@@ -124,6 +125,15 @@ Honest state of the project:
 ```sh
 ./build.sh              # rootless package
 ROOTHIDE=1 ./build.sh   # roothide package
+```
+
+`build.sh` first runs the host-side unit tests for the disassembly
+scanner (`tests/test_discovery.c`) and aborts if they fail
+(`SKIP_TESTS=1` to skip). To run the tests alone:
+
+```sh
+cc -std=c99 -Wall -Wno-unused-function -I. tests/test_discovery.c \
+    -o /tmp/test_discovery && /tmp/test_discovery
 ```
 
 ## How it works

@@ -32,6 +32,19 @@ STAGE="$OUT/stage"
 [ -f "control" ] || { echo "找不到 control 文件"; exit 1; }
 command -v dpkg-deb >/dev/null || { echo "找不到 dpkg-deb，请安装 dpkg"; exit 1; }
 
+# 主机端单测：反汇编扫描器（drag_discovery.h）必须先通过，否则不构建。
+# 这是发现逻辑唯一的自动化回归保障；iOS 18+ 的 double/gated 路径尤其依赖它。
+# SKIP_TESTS=1 可跳过（不推荐）。
+if [ "${SKIP_TESTS:-0}" != "1" ]; then
+    echo "== 主机端单测：反汇编扫描器 =="
+    TESTCC="${CC:-cc}"
+    command -v "$TESTCC" >/dev/null 2>&1 || TESTCC=clang
+    "$TESTCC" -std=c99 -Wall -Wno-unused-function -I"$PWD" \
+        "$PWD/tests/test_discovery.c" -o /tmp/animspeed_test_discovery \
+        && /tmp/animspeed_test_discovery \
+        || { echo "单测失败，停止构建"; exit 1; }
+fi
+
 rm -rf "$OUT"
 mkdir -p "$OUT" "$STAGE"
 
