@@ -61,6 +61,7 @@ static uint32_t *alloc_code(int nwords, uint64_t *page_out) {
 
 /* iOS 17 style: ungated 32-bit float store. */
 static void test_float_ungated(void) {
+    int start_failures = failures;
     uint64_t page; uint32_t *c = alloc_code(8, &page);
     c[0] = adrp(8);
     c[1] = add_imm(8, 8, 0x120);
@@ -74,11 +75,12 @@ static void test_float_ungated(void) {
     CHECK(d.valOff == (0x10u << 2), "float: valOff=%u want %u", d.valOff, 0x10u << 2);
     CHECK(d.isFloat && !d.gated, "float: want isFloat && !gated");
     free(c);
-    printf("float/ungated: %s\n", failures ? "FAIL" : "ok");
+    printf("float/ungated: %s\n", failures == start_failures ? "ok" : "FAIL");
 }
 
 /* iOS 18+ style: double store behind a revision gate. */
 static void test_double_gated(void) {
+    int start_failures = failures;
     uint64_t page; uint32_t *c = alloc_code(16, &page);
     c[0] = adrp(9);
     c[1] = ldr_w(10, 9, 0x80);      /* revVar = page + 0x80*4 = page+0x200 */
@@ -100,11 +102,40 @@ static void test_double_gated(void) {
     CHECK(d.revOnce == page + 0x208, "double: revOnce=%llx", (unsigned long long)d.revOnce);
     CHECK(d.revOff == 0, "double: revOff=%u want 0", d.revOff);
     free(c);
-    printf("double/gated: %s\n", failures ? "FAIL" : "ok");
+    printf("double/gated: %s\n", failures == start_failures ? "ok" : "FAIL");
+}
+
+
+/* iOS 18+ style, ADRP-only base: no ADD between ADRP and the stores.
+ * The sentinel STR Wt uses the ADRP page base directly; the scanner must
+ * resolve it the same way it resolves the STR Dt base (pv-or-pg), not
+ * require an ADD-computed value. */
+static void test_double_gated_adrp_only(void) {
+    int start_failures = failures;
+    uint64_t page; uint32_t *c = alloc_code(16, &page);
+    c[0] = adrp(9);
+    c[1] = ldr_w(10, 9, 0x80);      /* revVar = page + 0x200 */
+    c[2] = adrp(11);
+    c[3] = ldr_x(12, 11, 0x41);     /* revOnce = page + 0x208 */
+    c[4] = adrp(8);                 /* no ADD: base is the page itself */
+    c[5] = str_d(0, 8, 0x18);       /* g = page, valOff = 0x18*8 */
+    c[6] = str_w(1, 8, 0x08);       /* sentinel on the same base -> revOff = 0x20 */
+    c[7] = RET;
+
+    animspeed_drag_t d; memset(&d, 0, sizeof d);
+    CHECK(animspeed_scan_drag(c, (uint64_t)c, &d), "adrp-only: scan should succeed");
+    CHECK(d.g == page, "adrp-only: g=%llx want %llx",
+          (unsigned long long)d.g, (unsigned long long)page);
+    CHECK(d.valOff == (0x18u << 3), "adrp-only: valOff=%u want %u", d.valOff, 0x18u << 3);
+    CHECK(!d.isFloat && d.gated, "adrp-only: want !isFloat && gated");
+    CHECK(d.revOff == (0x08u << 2), "adrp-only: revOff=%u want %u", d.revOff, 0x08u << 2);
+    free(c);
+    printf("double/gated ADRP-only: %s\n", failures == start_failures ? "ok" : "FAIL");
 }
 
 /* Garbage body: scanner must report failure, not a bogus address. */
 static void test_no_match(void) {
+    int start_failures = failures;
     uint64_t page; uint32_t *c = alloc_code(8, &page);
     for (int i = 0; i < 7; i++) c[i] = NOP;
     c[7] = RET;
@@ -112,13 +143,14 @@ static void test_no_match(void) {
     animspeed_drag_t d; memset(&d, 0, sizeof d);
     CHECK(!animspeed_scan_drag(c, (uint64_t)c, &d), "nomatch: scan should fail");
     free(c);
-    printf("no-match: %s\n", failures ? "FAIL" : "ok");
+    printf("no-match: %s\n", failures == start_failures ? "ok" : "FAIL");
 }
 
 int main(void) {
     int before;
     before = failures; test_float_ungated();
     before = failures; test_double_gated();
+    before = failures; test_double_gated_adrp_only();
     before = failures; test_no_match();
     (void)before;
     if (failures) { printf("%d FAILURE(S)\n", failures); return 1; }

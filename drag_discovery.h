@@ -71,9 +71,17 @@ static bool animspeed_scan_drag(const uint32_t *code, uint64_t pc_base,
         } else if ((in & 0xffc00000) == 0xbd000000 && !g) {                 // STR St (float)
             uint64_t base = pv[rn] ? pv[rn] : pg[rn];
             if (base) { g = base; vOff = ((in >> 10) & 0xfff) << 2; isFloat = true; }
-        } else if ((in & 0xff800000) == 0xb9000000 && g && pv[rn] == g) {   // STR Wt sentinel
-            rOff = ((in >> 10) & 0xfff) << 2;
-            break;
+        } else if ((in & 0xff800000) == 0xb9000000 && g) {                 // STR Wt sentinel
+            // Resolve the base exactly like the STR branches above (ADD value
+            // if present, else the ADRP page): requiring pv[rn] == g missed
+            // the sentinel whenever the setter used ADRP alone, leaving
+            // revOff = 0 and making the writer stamp the revision value
+            // onto the coefficient base itself.
+            uint64_t base = pv[rn] ? pv[rn] : pg[rn];
+            if (base == g) {
+                rOff = ((in >> 10) & 0xfff) << 2;
+                break;
+            }
         }
     }
 

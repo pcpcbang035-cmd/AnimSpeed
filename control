@@ -1,6 +1,6 @@
 Package: com.ho.animspeed
 Name: AnimSpeed
-Version: 2.3
+Version: 2.4
 Architecture: iphoneos-arm64
 Description: System-wide iOS animation speedup via UIAnimationDragCoefficient
 Maintainer: Ho

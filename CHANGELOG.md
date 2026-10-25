@@ -3,6 +3,22 @@
 All notable changes to AnimSpeed are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [2.4] - 2026-10-25
+
+### Fixed
+- `drag_discovery.h`: the iOS 18+ revision-gate sentinel (`STR Wt`) now
+  resolves its base the same way the `STR Dt`/`STR St` branches do
+  (ADD-computed value if present, otherwise the ADRP page). Previously
+  it required an ADD-computed base, so a setter that used ADRP alone
+  for the coefficient base left `revOff = 0` — and the gated writer
+  would then stamp the revision value `0x7fffffff` onto the
+  coefficient base itself instead of the revision field. Covered by a
+  new host test (`double/gated ADRP-only` in `tests/test_discovery.c`),
+  which fails against the old scanner and passes with the fix.
+- `tests/test_discovery.c`: each test now reports its own pass/fail
+  status instead of the cumulative failure count, so a failure in an
+  earlier test no longer mislabels later passing tests as FAIL.
+
 ## [2.3] - 2026-10-22
 
 ### Added
