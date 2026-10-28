@@ -60,7 +60,13 @@ static bool animspeed_scan_drag(const uint32_t *code, uint64_t pc_base,
             pg[rd] = (ipc & ~0xfffULL) + off;
             pv[rd] = 0;
         } else if ((in & 0xff800000) == 0x91000000 && pg[rn]) {              // ADD imm
-            pv[rd] = pg[rn] + ((in >> 10) & 0xfff);
+            // ADD (immediate) has a 1-bit shift field at bit 22: 0 = LSL #0,
+            // 1 = LSL #12. Ignoring it silently mis-computed the base whenever
+            // the setter reached a global more than 4KB from the ADRP page
+            // (e.g. ADD X8, X8, #1, LSL #12 -> page + 0x1000, not page + 1),
+            // pointing the writer at the wrong address.
+            uint32_t imm = (in >> 10) & 0xfff;
+            pv[rd] = pg[rn] + ((in & 0x00400000) ? (imm << 12) : imm);
         } else if ((in & 0xffc00000) == 0xf9400000 && pg[rn] && !rO) {       // LDR Xt
             rO = pg[rn] + (((in >> 10) & 0xfff) << 3);
         } else if ((in & 0xffc00000) == 0xb9400000 && pg[rn] && !rV) {       // LDR Wt

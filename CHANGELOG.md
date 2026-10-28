@@ -3,6 +3,18 @@
 All notable changes to AnimSpeed are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [2.5] - 2026-10-28
+
+### Fixed
+- `drag_discovery.h`: the scanner's ADD (immediate) branch now honors
+  the LSL #12 shift bit (bit 22). Previously it used the raw imm12
+  unconditionally, so a setter that reached its global with e.g.
+  `ADD X8, X8, #1, LSL #12` resolved the base as page + 1 instead of
+  page + 0x1000 — pointing the coefficient writer at the wrong
+  address. Covered by a new host test (`double/gated ADD LSL #12` in
+  `tests/test_discovery.c`), which fails against the old scanner
+  (`g=...9001` instead of `...a000`) and passes with the fix.
+
 ## [2.4] - 2026-10-25
 
 ### Fixed

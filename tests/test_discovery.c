@@ -30,6 +30,10 @@ static uint32_t add_imm(int rd, int rn, uint32_t imm12) {
 static uint32_t ldr_w(int rt, int rn, uint32_t imm12) { /* LDR Wt, [Xn, #imm] */
     return 0xB9400000u | ((imm12 & 0xfff) << 10) | ((uint32_t)(rn & 31) << 5) | (uint32_t)(rt & 31);
 }
+static uint32_t add_imm_shift12(int rd, int rn, uint32_t imm12) {
+    /* ADD Rd, Rn, #imm12, LSL #12 (shift bit 22 set). */
+    return 0x91000000u | 0x00400000u | ((imm12 & 0xfff) << 10) | ((uint32_t)(rn & 31) << 5) | (uint32_t)(rd & 31);
+}
 static uint32_t ldr_x(int rt, int rn, uint32_t imm12) { /* LDR Xt, [Xn, #imm] */
     return 0xF9400000u | ((imm12 & 0xfff) << 10) | ((uint32_t)(rn & 31) << 5) | (uint32_t)(rt & 31);
 }
@@ -133,6 +137,34 @@ static void test_double_gated_adrp_only(void) {
     printf("double/gated ADRP-only: %s\n", failures == start_failures ? "ok" : "FAIL");
 }
 
+/* iOS 18+ style, shifted ADD: the setter reaches a global more than 4KB
+ * from the ADRP page via ADD X8, X8, #1, LSL #12. The scanner must apply
+ * the shift (page + 0x1000), not the raw imm12 (page + 1). Negative
+ * control: this case resolves to the wrong base on the old scanner. */
+static void test_double_gated_add_shift12(void) {
+    int start_failures = failures;
+    uint64_t page; uint32_t *c = alloc_code(16, &page);
+    c[0] = adrp(9);
+    c[1] = ldr_w(10, 9, 0x80);      /* revVar = page + 0x200 */
+    c[2] = adrp(11);
+    c[3] = ldr_x(12, 11, 0x41);     /* revOnce = page + 0x208 */
+    c[4] = adrp(8);
+    c[5] = add_imm_shift12(8, 8, 1); /* base = page + 0x1000 */
+    c[6] = str_d(0, 8, 0x10);       /* g = page+0x1000, valOff = 0x10*8 */
+    c[7] = str_w(1, 8, 0x04);       /* sentinel -> revOff = 0x10 */
+    c[8] = RET;
+
+    animspeed_drag_t d; memset(&d, 0, sizeof d);
+    CHECK(animspeed_scan_drag(c, (uint64_t)c, &d), "shift12: scan should succeed");
+    CHECK(d.g == page + 0x1000, "shift12: g=%llx want %llx",
+          (unsigned long long)d.g, (unsigned long long)(page + 0x1000));
+    CHECK(d.valOff == (0x10u << 3), "shift12: valOff=%u want %u", d.valOff, 0x10u << 3);
+    CHECK(!d.isFloat && d.gated, "shift12: want !isFloat && gated");
+    CHECK(d.revOff == (0x04u << 2), "shift12: revOff=%u want %u", d.revOff, 0x04u << 2);
+    free(c);
+    printf("double/gated ADD LSL #12: %s\n", failures == start_failures ? "ok" : "FAIL");
+}
+
 /* Garbage body: scanner must report failure, not a bogus address. */
 static void test_no_match(void) {
     int start_failures = failures;
@@ -151,6 +183,7 @@ int main(void) {
     before = failures; test_float_ungated();
     before = failures; test_double_gated();
     before = failures; test_double_gated_adrp_only();
+    before = failures; test_double_gated_add_shift12();
     before = failures; test_no_match();
     (void)before;
     if (failures) { printf("%d FAILURE(S)\n", failures); return 1; }
