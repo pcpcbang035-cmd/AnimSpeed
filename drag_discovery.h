@@ -46,6 +46,12 @@ static bool animspeed_scan_drag(const uint32_t *code, uint64_t pc_base,
     uint64_t pc = pc_base;
     uint64_t pg[32] = {0}, pv[32] = {0}, g = 0, rV = 0, rO = 0;
     uint32_t vOff = 0, rOff = 0;
+    // Revision-sentinel candidates (STR Wt stores). The sentinel may appear
+    // before the coefficient store, so candidates are collected during the
+    // scan and resolved against g afterwards (see the STR Wt branch).
+    uint64_t senBase[8] = {0};
+    uint32_t senOff[8] = {0};
+    int nSen = 0;
     bool isFloat = false;
 
     for (int i = 0; i < 80; i++) {
@@ -77,21 +83,31 @@ static bool animspeed_scan_drag(const uint32_t *code, uint64_t pc_base,
         } else if ((in & 0xffc00000) == 0xbd000000 && !g) {                 // STR St (float)
             uint64_t base = pv[rn] ? pv[rn] : pg[rn];
             if (base) { g = base; vOff = ((in >> 10) & 0xfff) << 2; isFloat = true; }
-        } else if ((in & 0xff800000) == 0xb9000000 && g) {                 // STR Wt sentinel
+        } else if ((in & 0xff800000) == 0xb9000000) {                     // STR Wt sentinel
             // Resolve the base exactly like the STR branches above (ADD value
-            // if present, else the ADRP page): requiring pv[rn] == g missed
-            // the sentinel whenever the setter used ADRP alone, leaving
-            // revOff = 0 and making the writer stamp the revision value
-            // onto the coefficient base itself.
+            // if present, else the ADRP page). Do NOT require g yet: the
+            // compiler may schedule the sentinel store before the coefficient
+            // store, and the old g-first check then skipped it entirely,
+            // leaving revOff = 0 so the gated writer stamped the revision
+            // value 0x7fffffff onto the coefficient base itself. Instead,
+            // collect every candidate and resolve it against g after the
+            // loop; a store to an unrelated base simply never matches.
             uint64_t base = pv[rn] ? pv[rn] : pg[rn];
-            if (base == g) {
-                rOff = ((in >> 10) & 0xfff) << 2;
-                break;
+            if (base && nSen < 8) {
+                senBase[nSen] = base;
+                senOff[nSen] = ((in >> 10) & 0xfff) << 2;
+                nSen++;
             }
         }
     }
 
     if (!g) return false;
+
+    // Resolve the revision sentinel: the candidate stored to the same base
+    // as the coefficient global marks the revision field's offset.
+    for (int j = 0; j < nSen; j++) {
+        if (senBase[j] == g) { rOff = senOff[j]; break; }
+    }
 
     bool gated = (rV && rO && (rO == rV + 8 || rV == rO + 8));
     o->g = g; o->revVar = rV; o->revOnce = rO;

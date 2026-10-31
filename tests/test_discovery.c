@@ -165,6 +165,36 @@ static void test_double_gated_add_shift12(void) {
     printf("double/gated ADD LSL #12: %s\n", failures == start_failures ? "ok" : "FAIL");
 }
 
+/* iOS 18+ style, sentinel first: the compiler schedules the STR Wt
+ * revision sentinel BEFORE the STR Dt coefficient store. The scanner must
+ * still resolve revOff from it; the old g-first check skipped the sentinel
+ * entirely (revOff stayed 0), so the gated writer would stamp 0x7fffffff
+ * onto the coefficient base itself. Negative control: this case yields
+ * revOff = 0 on the old scanner. */
+static void test_double_gated_sentinel_first(void) {
+    int start_failures = failures;
+    uint64_t page; uint32_t *c = alloc_code(16, &page);
+    c[0] = adrp(9);
+    c[1] = ldr_w(10, 9, 0x80);      /* revVar = page + 0x200 */
+    c[2] = adrp(11);
+    c[3] = ldr_x(12, 11, 0x41);     /* revOnce = page + 0x208 */
+    c[4] = adrp(8);
+    c[5] = add_imm(8, 8, 0x100);
+    c[6] = str_w(1, 8, 0x04);       /* sentinel FIRST -> revOff = 0x10 */
+    c[7] = str_d(0, 8, 0x10);       /* g = page+0x100, valOff = 0x10*8 */
+    c[8] = RET;
+
+    animspeed_drag_t d; memset(&d, 0, sizeof d);
+    CHECK(animspeed_scan_drag(c, (uint64_t)c, &d), "sentinel-first: scan should succeed");
+    CHECK(d.g == page + 0x100, "sentinel-first: g=%llx want %llx",
+          (unsigned long long)d.g, (unsigned long long)(page + 0x100));
+    CHECK(d.valOff == (0x10u << 3), "sentinel-first: valOff=%u want %u", d.valOff, 0x10u << 3);
+    CHECK(!d.isFloat && d.gated, "sentinel-first: want !isFloat && gated");
+    CHECK(d.revOff == (0x04u << 2), "sentinel-first: revOff=%u want %u", d.revOff, 0x04u << 2);
+    free(c);
+    printf("double/gated sentinel-first: %s\n", failures == start_failures ? "ok" : "FAIL");
+}
+
 /* Garbage body: scanner must report failure, not a bogus address. */
 static void test_no_match(void) {
     int start_failures = failures;
@@ -184,6 +214,7 @@ int main(void) {
     before = failures; test_double_gated();
     before = failures; test_double_gated_adrp_only();
     before = failures; test_double_gated_add_shift12();
+    before = failures; test_double_gated_sentinel_first();
     before = failures; test_no_match();
     (void)before;
     if (failures) { printf("%d FAILURE(S)\n", failures); return 1; }

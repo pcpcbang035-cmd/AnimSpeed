@@ -3,6 +3,22 @@
 All notable changes to AnimSpeed are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [2.6] - 2026-10-31
+
+### Fixed
+- `drag_discovery.h`: the revision-gate sentinel (`STR Wt`) no longer
+  requires the coefficient store to come first. The scanner now collects
+  every `STR Wt` candidate during the scan and resolves it against the
+  coefficient base afterwards, so a setter whose compiler scheduled the
+  sentinel before the `STR Dt` store still yields the correct `revOff`.
+  Previously the sentinel was skipped outright in that ordering, leaving
+  `revOff = 0` — and the gated writer then stamped the revision value
+  `0x7fffffff` onto the coefficient base itself instead of the revision
+  field. Covered by a new host test (`double/gated sentinel-first` in
+  `tests/test_discovery.c`), which fails against the old scanner
+  (`revOff=0`) and passes with the fix. Other orderings are unchanged
+  (existing tests still pass).
+
 ## [2.5] - 2026-10-28
 
 ### Fixed
